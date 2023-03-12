@@ -16,7 +16,7 @@ def connectBD():
     db = mysql.connector.connect(
         host = "localhost",
         user = "root",
-        passwd = "claumestra",
+        passwd = "metamorfo2",
         database = "users"
     )
     return db
@@ -38,7 +38,7 @@ def initBD():
             genre enum('H','D','NS/NC')); "
     cursor.execute(query)
             
-    # Operación de inicialización de la tabla users (si está vacía)
+ # Operación de inicialización de la tabla users (si está vacía)
     query="SELECT count(*) FROM users;"
     cursor.execute(query)
     count = cursor.fetchall()[0][0]
@@ -51,27 +51,35 @@ def initBD():
     bd.close()
     return
 
-# checkUser: comprueba si el par usuario-contraseña existe en la BD
-def checkUser(user,password):
-    bd=connectBD()
-    cursor=bd.cursor()
 
-    query=f"SELECT user,name,surname1,surname2,age,genre FROM users WHERE user='{user}'\
-            AND password='{password}'"
-    print(query)
-    cursor.execute(query)
+def checkUser(user, password):
+    bd = connectBD()
+    cursor = bd.cursor()
+# esta funcion usa parametros de entrada (se comportan como valores no parte de la consulta sql)con lo que evita la inyeccion de codigo 
+    query = f"""SELECT user,name,surname1,surname2,age,genre FROM users WHERE user=%s\
+            AND password=%s"""
+    params = (user, password)
+    cursor.execute(query, params)
     userData = cursor.fetchall()
     bd.close()
-    
     if userData == []:
         return False
     else:
         return userData[0]
+  
 
 # cresteUser: crea un nuevo usuario en la BD
 def createUser(user,password,name,surname1,surname2,age,genre):
+    bd = connectBD()
+    cursor = bd.cursor()
+    query_1 = "insert into users (user,password,name,surname1,surname2,age,genre) value (%s,%s,%s,%s,%s,%s,%s)"
+    val_1 = user, password, name, surname1, surname2, age, genre
+    cursor.execute(query_1, val_1)
+    nuevoUsuario = cursor.rowcount
+    bd.commit()
+    bd.close()
+    return nuevoUsuario
     
-    return
 
 # Secuencia principal: configuración de la aplicación web ##########################################
 # Instanciación de la aplicación web Flask
@@ -89,7 +97,7 @@ def login():
 
 @app.route("/signin")
 def signin():
-    return "SIGN IN PAGE"
+    return render_template("signin.html")
 
 @app.route("/results",methods=('GET', 'POST'))
 def results():
@@ -104,6 +112,27 @@ def results():
         else:
             return render_template("results.html",login=True,userData=userData)
         
+@app.route("/newUser",methods=('GET', 'POST'))      
+def newUser():
+    if request.method == ('POST'):
+        formData = request.form
+        user=formData['usuario']
+        password=formData['contrasena']
+        name=formData['nombre']
+        surname1=formData['apellido1']
+        surname2=formData['apellido2']
+        age=formData['edad']
+        genre=formData['salario']
+        
+        userData = createUser(user,password,name,surname1,surname2,age,genre)
+
+        if userData == False:
+            return render_template("home.html")
+        else:
+            return render_template("results.html")
+        
 # Configuración y arranque de la aplicación web
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.run(host='localhost', port=5000, debug=True)
+
+
